@@ -4,30 +4,24 @@ from datetime import datetime
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 
-SNOWFLAKE_CONN_ID = 'my_snowflake_conn'
-SLACK_CONN_ID = 'my_slack_conn'
-# TODO: should be able to rely on connection's schema, but currently param required by S3ToSnowflakeTransfer
-SNOWFLAKE_SCHEMA = 'schema_name'
-SNOWFLAKE_STAGE = 'stage_name'
-SNOWFLAKE_WAREHOUSE = 'warehouse_name'
-SNOWFLAKE_DATABASE = 'database_name'
-SNOWFLAKE_ROLE = 'role_name'
-SNOWFLAKE_SAMPLE_TABLE = 'sample_table'
-S3_FILE_PATH = '</path/to/file/sample_file.csv'
+DAG_ID = "snowflake-test"
+
+SNOWFLAKE_CONN_ID = 'snowflake_conn'
+SNOWFLAKE_ROLE = 'ACCOUNTADMIN'
+SNOWFLAKE_DATABASE = 'SOVRN'
+SNOWFLAKE_SCHEMA = 'PUBLIC'
+SNOWFLAKE_WAREHOUSE = 'COMPUTE_WH'
 
 # SQL commands
+SNOWFLAKE_SAMPLE_TABLE = 'tbl_airflow_test'
 CREATE_TABLE_SQL_STRING = (
-    f"CREATE OR REPLACE TRANSIENT TABLE {SNOWFLAKE_SAMPLE_TABLE} (name VARCHAR(250), id INT);"
+    f"CREATE OR REPLACE TABLE {SNOWFLAKE_SAMPLE_TABLE} (name VARCHAR(250), id INT);"
 )
 SQL_INSERT_STATEMENT = f"INSERT INTO {SNOWFLAKE_SAMPLE_TABLE} VALUES ('name', %(id)s)"
 SQL_LIST = [SQL_INSERT_STATEMENT % {"id": n} for n in range(0, 10)]
 SQL_MULTIPLE_STMTS = "; ".join(SQL_LIST)
-SNOWFLAKE_SLACK_SQL = f"SELECT name, id FROM {SNOWFLAKE_SAMPLE_TABLE} LIMIT 10;"
-SNOWFLAKE_SLACK_MESSAGE = (
-    "Results in an ASCII table:\n```{{ results_df | tabulate(tablefmt='pretty', headers='keys') }}```"
-)
+
 ENV_ID = os.environ.get("SYSTEM_TESTS_ENV_ID")
-DAG_ID = "example_snowflake"
 
 # [START howto_operator_snowflake]
 
@@ -48,9 +42,30 @@ with DAG(
         role=SNOWFLAKE_ROLE,
     )
 
+    snowflake_op_with_params = SnowflakeOperator(
+        task_id='snowflake_op_with_params',
+        sql=SQL_INSERT_STATEMENT,
+        parameters={"id": 56},
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA,
+        role=SNOWFLAKE_ROLE,
+    )
+
+    snowflake_op_sql_list = SnowflakeOperator(task_id='snowflake_op_sql_list', sql=SQL_LIST)
+
+    snowflake_op_sql_multiple_stmts = SnowflakeOperator(
+        task_id='snowflake_op_sql_multiple_stmts',
+        sql=SQL_MULTIPLE_STMTS,
+    )
+
     (
         snowflake_op_sql_str
+        >> [
+            snowflake_op_with_params,
+            snowflake_op_sql_list,
+            snowflake_op_sql_multiple_stmts,
+        ]
     )
-    # [END snowflake_example_dag]
 
 dag
