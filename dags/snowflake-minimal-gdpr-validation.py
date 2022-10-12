@@ -13,12 +13,11 @@ SNOWFLAKE_SCHEMA = 'PUBLIC'
 SNOWFLAKE_WAREHOUSE = 'COMPUTE_WH'
 
 SNOWFLAKE_VIEW = 'VW_WEB_SHARETHIS_GDPR'
-#SQL_TEXT = "SHOW VIEWS LIKE '%_GDPR'"
-SQL_TEXT = f"SELECT GET_DDL('VIEW', '{SNOWFLAKE_VIEW}') AS DDL"
+SQL_TEXT = "SHOW VIEWS LIKE '%_GDPR'"
 
 def validate_gdpr(cursor):
     for row in cursor:
-        ddl_string = str(row["DDL"])
+        ddl_string = str(row["text"]) #text column contains DDL used to create the view
         ddl_string = ddl_string.translate({ord(c): None for c in string.whitespace}).lower() #Remove all whitespace and convert to lc
         print(ddl_string)
         if "gdpr=true" in ddl_string:
@@ -26,10 +25,6 @@ def validate_gdpr(cursor):
         else:
             print("GDPR check not present") 
         
-
-
-
-
 with DAG(
     DAG_ID,
     default_args={'snowflake_conn_id': f'{SNOWFLAKE_CONN_ID}'},
