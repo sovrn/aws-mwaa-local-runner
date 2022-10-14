@@ -5,6 +5,7 @@ from airflow import DAG
 from airflow.providers.amazon.aws.hooks.dynamodb import AwsDynamoDBHook
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.decorators import task
+from airflow.exceptions import AirflowException
 
 SNOWFLAKE_CONN_ID = 'snowflake_conn'
 SNOWFLAKE_ROLE = 'ACCOUNTADMIN'
@@ -74,6 +75,8 @@ def check_for_gdpr_validation(ti=None):
     stage_dict = ti.xcom_pull(task_ids='get_gdpr_stages_task', key='return_value')
     view_dict = ti.xcom_pull(task_ids='get_gdpr_views_task', key='return_value')
 
+    fail_check = False
+
     for stage_name, url in stage_dict.items():
         if stage_name != 'STG_WEB_TEST_GDPR':
             continue
@@ -89,6 +92,10 @@ def check_for_gdpr_validation(ti=None):
             pass
         else:
             set_inactive(dynamo_key)
+            fail_check = True
+    
+    if fail_check:
+        raise AirflowException("GDPR or Audience check failed")
 
 with DAG(
     'snowflake-minimal-gdpr-validation',
