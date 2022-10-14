@@ -1,8 +1,10 @@
 import string
 from datetime import datetime
 
+from util.util import Util
+from util.aws.boto3 import Boto3
+
 from airflow import DAG
-from airflow.providers.amazon.aws.hooks.dynamodb import AwsDynamoDBHook
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.decorators import task
 from airflow.exceptions import AirflowException
@@ -17,37 +19,7 @@ SQL_TEXT_STAGES = "SHOW STAGES LIKE '%_GDPR'"
 SQL_TEXT_VIEWS = "SHOW VIEWS LIKE '%_GDPR'"
 
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
-
-def set_inactive(dynamo_key):
-    client = AwsDynamoDBHook(client_type='dynamodb').conn
-    
-    client.update_item(
-        TableName=DYANMO_TABLE_NAME,
-        Key={'staging_prefix': {
-            'S': f'{dynamo_key}'
-        }},
-        UpdateExpression='SET #active = :value',
-        ExpressionAttributeNames={
-            '#active' : 'active'
-        },
-        ExpressionAttributeValues={
-            ':value': {'BOOL': False}
-        }
-    )
-
-def parse_for_key(url):
-    key_start = url.find('/snowflake')
-    key = url[key_start:]
-
-    return key
-
-def get_view_from_stage(stage_name):
-    if 'DAILY' in stage_name:
-        return stage_name.replace('STG_DAILY', 'VW')
-    elif 'INACTIVE' in stage_name:
-        return stage_name.replace('STG_INACTIVE', 'VW')
-    else:
-        return stage_name.replace('STG', 'VW')
+DYNAMO_KEY_FIELD = 'staging_prefix'
 
 # Returns a dictionary of GDPR stages and with their corresponding URLs, which will eventually
 # be parsed into DyanmoDB keys
@@ -79,7 +51,7 @@ def save_view_ddl(results):
     return view_dict
 
 with DAG(
-    'snowflake-minimal-gdpr-validation',
+    'snowflake-gdpr-validation',
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
@@ -115,15 +87,25 @@ with DAG(
         fail_check = False
 
         for stage_name, url in stage_dict.items():
-            view_name = get_view_from_stage(stage_name)
+            view_name = Util.get_view_from_stage(stage_name)
 
-            dynamo_key = parse_for_key(url)
+            if view_name != 'VW_WEB_TEST_GDPR':
+                continue
+
+            dynamo_key = Util.parse_for_key(url)
             ddl_string = view_dict[view_name]
 
             if "gdpr=true" and "audience_approved=true" in ddl_string:
                 pass
             else:
-                set_inactive(dynamo_key)
+                # Deactivates the customer's delivery
+                Boto3.set_dynamo_attr_false(
+                    DYANMO_TABLE_NAME,
+                    DYNAMO_KEY_FIELD,
+                    dynamo_key,
+                    'active'
+                )
+                # Prepares an alert to be sent
                 fail_check = True
         
         if fail_check:
