@@ -18,6 +18,37 @@ SQL_TEXT_VIEWS = "SHOW VIEWS LIKE '%_GDPR'"
 
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
 
+def set_inactive(dynamo_key):
+    client = AwsDynamoDBHook(client_type='dynamodb').conn
+    
+    client.update_item(
+        TableName=DYANMO_TABLE_NAME,
+        Key={'staging_prefix': {
+            'S': f'{dynamo_key}'
+        }},
+        UpdateExpression='SET #active = :value',
+        ExpressionAttributeNames={
+            '#active' : 'active'
+        },
+        ExpressionAttributeValues={
+            ':value': {'BOOL': False}
+        }
+    )
+
+def parse_for_key(url):
+    key_start = url.find('/snowflake')
+    key = url[key_start:]
+
+    return key
+
+def get_view_from_stage(stage_name):
+    if 'DAILY' in stage_name:
+        return stage_name.replace('STG_DAILY', 'VW')
+    elif 'INACTIVE' in stage_name:
+        return stage_name.replace('STG_INACTIVE', 'VW')
+    else:
+        return stage_name.replace('STG', 'VW')
+
 # Returns a dictionary of GDPR stages and with their corresponding URLs, which will eventually
 # be parsed into DyanmoDB keys
 def save_stage_urls(results):
@@ -47,56 +78,6 @@ def save_view_ddl(results):
     
     return view_dict
 
-def parse_for_key(url):
-    key_start = url.find('/snowflake')
-    key = url[key_start:]
-
-    return key
-
-def set_inactive(dynamo_key):
-    client = AwsDynamoDBHook(client_type='dynamodb').conn
-    
-    client.update_item(
-        TableName=DYANMO_TABLE_NAME,
-        Key={'staging_prefix': {
-            'S': f'{dynamo_key}'
-        }},
-        UpdateExpression='SET #active = :value',
-        ExpressionAttributeNames={
-            '#active' : 'active'
-        },
-        ExpressionAttributeValues={
-            ':value': {'BOOL': False}
-        }
-    )
-
-@task
-def check_for_gdpr_validation(ti=None):
-    stage_dict = ti.xcom_pull(task_ids='get_gdpr_stages_task', key='return_value')
-    view_dict = ti.xcom_pull(task_ids='get_gdpr_views_task', key='return_value')
-
-    fail_check = False
-
-    for stage_name, url in stage_dict.items():
-        if stage_name != 'STG_WEB_TEST_GDPR':
-            continue
-
-        if any(qualifier in stage_name for qualifier in ['DAILY', 'INACTIVE']):
-            continue
-
-        view_name = stage_name.replace('STG', 'VW')
-        dynamo_key = parse_for_key(url)
-        ddl_string = view_dict[view_name]
-
-        if "gdpr=true" and "audience_approved=true" in ddl_string:
-            pass
-        else:
-            set_inactive(dynamo_key)
-            fail_check = True
-    
-    if fail_check:
-        raise AirflowException("GDPR or Audience check failed")
-
 with DAG(
     'snowflake-minimal-gdpr-validation',
     start_date=datetime(1970, 1, 1),
@@ -125,5 +106,27 @@ with DAG(
         handler=save_view_ddl,
         dag=dag
     )
+
+    @task
+    def check_for_gdpr_validation(ti=None):
+        stage_dict = ti.xcom_pull(task_ids='get_gdpr_stages_task', key='return_value')
+        view_dict = ti.xcom_pull(task_ids='get_gdpr_views_task', key='return_value')
+
+        fail_check = False
+
+        for stage_name, url in stage_dict.items():
+            view_name = get_view_from_stage(stage_name)
+
+            dynamo_key = parse_for_key(url)
+            ddl_string = view_dict[view_name]
+
+            if "gdpr=true" and "audience_approved=true" in ddl_string:
+                pass
+            else:
+                set_inactive(dynamo_key)
+                fail_check = True
+        
+        if fail_check:
+            raise AirflowException("GDPR or Audience check failed")
 
     [get_gdpr_stages_task, get_gdpr_views_task] >> check_for_gdpr_validation()
