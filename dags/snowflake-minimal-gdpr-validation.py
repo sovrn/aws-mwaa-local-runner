@@ -2,6 +2,7 @@ import string
 from datetime import datetime
 
 from airflow import DAG
+from airflow.providers.amazon.aws.hooks.dynamodb import AwsDynamoDBHook
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.decorators import task
 
@@ -11,10 +12,28 @@ SNOWFLAKE_DATABASE = 'SOVRN'
 SNOWFLAKE_SCHEMA = 'PUBLIC'
 SNOWFLAKE_WAREHOUSE = 'COMPUTE_WH'
 
-SQL_TEXT = "SHOW VIEWS LIKE '%_GDPR'"
+SQL_TEXT_STAGES = "SHOW STAGES LIKE '%_GDPR'"
+SQL_TEXT_VIEWS = "SHOW VIEWS LIKE '%_GDPR'"
 
-def get_ddl(results):
-    ddl_dict={}
+DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
+
+# Returns a dictionary of GDPR stages and with their corresponding URLs, which will eventually
+# be parsed into DyanmoDB keys
+def save_stage_urls(results):
+    stage_dict = {}
+
+    for row in results:
+        stage_name = str(row['name'])
+        url = str(row['url'])
+
+        stage_dict[stage_name] = url
+
+    return stage_dict
+
+# Returns a dictionary of GDPR views and the DDL that was used to create them. This DDL will be
+# checked for the correct compliance filters
+def save_view_ddl(results):
+    view_dict={}
 
     for row in results:
         view_name = str(row["name"])
@@ -23,35 +42,81 @@ def get_ddl(results):
             {ord(c): None for c in string.whitespace}
         ).lower()
 
-        ddl_dict[view_name] = ddl_string
+        view_dict[view_name] = ddl_string
     
-    return ddl_dict
+    return view_dict
+
+def parse_for_key(url):
+    key_start = url.find('/snowflake')
+    key = url[key_start:]
+
+    return key
+
+def set_inactive(dynamo_key):
+    client = AwsDynamoDBHook(client_type='dynamodb').conn
+    
+    client.update_item(
+        TableName=DYANMO_TABLE_NAME,
+        Key={'staging_prefix': {
+            'S': f'{dynamo_key}'
+        }},
+        UpdateExpression='SET #active = :value',
+        ExpressionAttributeNames={
+            '#active' : 'active'
+        },
+        ExpressionAttributeValues={
+            ':value': {'BOOL': False}
+        }
+    )
 
 @task
 def check_for_gdpr_validation(ti=None):
-    ddl_dict = ti.xcom_pull(task_ids="get_ddl_task", key="return_value")
+    stage_dict = ti.xcom_pull(task_ids='get_gdpr_stages_task', key='return_value')
+    view_dict = ti.xcom_pull(task_ids='get_gdpr_views_task', key='return_value')
 
-    for view_name, ddl_string in ddl_dict.items():
-        if "gdpr=true" in ddl_string:
-            print(view_name, "GDPR Check is present")
+    for stage_name, url in stage_dict.items():
+        if stage_name != 'STG_WEB_TEST_GDPR':
+            continue
+
+        if any(qualifier in stage_name for qualifier in ['DAILY', 'INACTIVE']):
+            continue
+
+        view_name = stage_name.replace('STG', 'VW')
+        dynamo_key = parse_for_key(url)
+        ddl_string = view_dict[view_name]
+
+        if "gdpr=true" and "audience_approved=true" in ddl_string:
+            pass
         else:
-            print(view_name, "GDPR Check not present")
+            set_inactive(dynamo_key)
 
 with DAG(
     'snowflake-minimal-gdpr-validation',
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
-    get_ddl_task = SnowflakeOperator(
-            snowflake_conn_id = 'snowflake_conn',
-            task_id='get_ddl_task',
-            sql=f'{SQL_TEXT}',
-            warehouse=SNOWFLAKE_WAREHOUSE,
-            database=SNOWFLAKE_DATABASE,
-            schema=SNOWFLAKE_SCHEMA,
-            role=SNOWFLAKE_ROLE,
-            handler=get_ddl,
-            dag=dag
-        )
+    get_gdpr_stages_task = SnowflakeOperator(
+        snowflake_conn_id = 'snowflake_conn',
+        task_id='get_gdpr_stages_task',
+        sql=f'{SQL_TEXT_STAGES}',
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA,
+        role=SNOWFLAKE_ROLE,
+        handler=save_stage_urls,
+        dag=dag
+    )
 
-    get_ddl_task >> check_for_gdpr_validation()
+    get_gdpr_views_task = SnowflakeOperator(
+        snowflake_conn_id = 'snowflake_conn',
+        task_id='get_gdpr_views_task',
+        sql=f'{SQL_TEXT_VIEWS}',
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA,
+        role=SNOWFLAKE_ROLE,
+        handler=save_view_ddl,
+        dag=dag
+    )
+
+    [get_gdpr_stages_task, get_gdpr_views_task] >> check_for_gdpr_validation()
