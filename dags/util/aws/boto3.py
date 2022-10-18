@@ -1,8 +1,13 @@
 from airflow.providers.amazon.aws.hooks.dynamodb import AwsDynamoDBHook
 
+AWS_CONN_ID = 'aws_ops_access'
+
 class Boto3:
     def set_dynamo_attr_false(table_name, key_field, key, attr_name):
-        client = AwsDynamoDBHook(client_type='dynamodb').conn
+        client = AwsDynamoDBHook(
+            aws_conn_id=AWS_CONN_ID,
+            client_type='dynamodb'
+        ).conn
         
         client.update_item(
             TableName=table_name,
