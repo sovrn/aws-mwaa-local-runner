@@ -89,9 +89,6 @@ with DAG(
         for stage_name, url in stage_dict.items():
             view_name = Util.get_view_from_stage(stage_name)
 
-            if view_name != 'VW_WEB_TEST_GDPR':
-                continue
-
             dynamo_key = Util.parse_for_key(url)
             ddl_string = view_dict[view_name]
 
