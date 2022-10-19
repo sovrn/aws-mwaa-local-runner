@@ -55,9 +55,9 @@ with DAG(
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
-    get_gdpr_stages_task = SnowflakeOperator(
+    get_gdpr_stages = SnowflakeOperator(
         snowflake_conn_id = 'snowflake_conn',
-        task_id='get_gdpr_stages_task',
+        task_id='get_gdpr_stages',
         sql=f'{SQL_TEXT_STAGES}',
         warehouse=SNOWFLAKE_WAREHOUSE,
         database=SNOWFLAKE_DATABASE,
@@ -67,9 +67,9 @@ with DAG(
         dag=dag
     )
 
-    get_gdpr_views_task = SnowflakeOperator(
+    get_gdpr_views = SnowflakeOperator(
         snowflake_conn_id = 'snowflake_conn',
-        task_id='get_gdpr_views_task',
+        task_id='get_gdpr_views',
         sql=f'{SQL_TEXT_VIEWS}',
         warehouse=SNOWFLAKE_WAREHOUSE,
         database=SNOWFLAKE_DATABASE,
@@ -108,4 +108,4 @@ with DAG(
         if fail_check:
             raise AirflowException("GDPR or Audience check failed")
 
-    [get_gdpr_stages_task, get_gdpr_views_task] >> check_for_gdpr_validation()
+    [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation()
