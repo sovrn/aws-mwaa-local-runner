@@ -51,7 +51,7 @@ def save_view_ddl(results):
     return view_dict
 
 with DAG(
-    'snowflake-gdpr-validation',
+    'snowflake-delivery',
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
