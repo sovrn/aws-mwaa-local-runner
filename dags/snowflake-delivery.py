@@ -1,10 +1,13 @@
 import string
 from datetime import datetime
+from typing import Iterable
 
 from util.util import Util
 from util.aws.boto3 import Boto3
 
 from airflow import DAG
+from airflow.operators.dummy_operator import DummyOperator
+from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.decorators import task
 from airflow.exceptions import AirflowException
@@ -50,6 +53,22 @@ def save_view_ddl(results):
     
     return view_dict
 
+def get_snowflake_delivery_settings() -> Iterable:
+    boto3 = Boto3('dynamodb')
+
+    return boto3.get_dynamo_table_items(DYANMO_TABLE_NAME)
+
+def deliver_data(setting):
+    view = setting['view']
+
+    task = PythonOperator(
+        task_id=f"deliver_data_from_{view}",
+        python_callable=lambda: print(setting)
+    )
+    task.set_upstream(delivery_grouping)
+
+    return task
+
 with DAG(
     'snowflake-delivery',
     start_date=datetime(1970, 1, 1),
@@ -63,8 +82,7 @@ with DAG(
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
         role=SNOWFLAKE_ROLE,
-        handler=save_stage_urls,
-        dag=dag
+        handler=save_stage_urls
     )
 
     get_gdpr_views = SnowflakeOperator(
@@ -75,8 +93,11 @@ with DAG(
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
         role=SNOWFLAKE_ROLE,
-        handler=save_view_ddl,
-        dag=dag
+        handler=save_view_ddl
+    )
+
+    delivery_grouping = DummyOperator(
+        task_id="delivery_grouping"
     )
 
     @task
@@ -110,4 +131,9 @@ with DAG(
         if fail_check:
             raise AirflowException("GDPR or Audience check failed")
 
-    [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation()
+    [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation() >> delivery_grouping
+
+    # Airflow dynamic tasks should be used here (v2.3.0), but this workaround is necessary for Airflow v2.2.2
+    for setting in get_snowflake_delivery_settings():
+        if setting['active']:
+            deliver_data(setting)
