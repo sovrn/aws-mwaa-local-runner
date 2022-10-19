@@ -102,8 +102,8 @@ with DAG(
 
     @task
     def check_for_gdpr_validation(ti=None):
-        stage_dict = ti.xcom_pull(task_ids='get_gdpr_stages_task', key='return_value')
-        view_dict = ti.xcom_pull(task_ids='get_gdpr_views_task', key='return_value')
+        stage_dict = ti.xcom_pull(task_ids='get_gdpr_stages', key='return_value')
+        view_dict = ti.xcom_pull(task_ids='get_gdpr_views', key='return_value')
 
         fail_check = False
 
