@@ -20,6 +20,7 @@ SNOWFLAKE_WAREHOUSE = 'COMPUTE_WH'
 
 SQL_TEXT_STAGES = "SHOW STAGES LIKE '%_GDPR'"
 SQL_TEXT_VIEWS = "SHOW VIEWS LIKE '%_GDPR'"
+SQL_TEXT_DELIVERIES = "CALL SP_DELIVER_WEBLOG_DATA('{dt_hour}', '{view}')"
 
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
 DYNAMO_KEY_FIELD = 'staging_prefix'
@@ -53,7 +54,7 @@ def save_view_ddl(results):
     
     return view_dict
 
-def get_snowflake_delivery_settings() -> Iterable:
+def get_snowflake_customers() -> Iterable:
     boto3 = Boto3('dynamodb')
 
     return boto3.get_dynamo_table_items(DYANMO_TABLE_NAME)
@@ -61,13 +62,18 @@ def get_snowflake_delivery_settings() -> Iterable:
 def deliver_data(setting):
     view = setting['view']
 
-    task = PythonOperator(
-        task_id=f"deliver_data_from_{view}",
-        python_callable=lambda: print(setting)
+    deliver_data = SnowflakeOperator(
+        snowflake_conn_id = 'snowflake_conn',
+        task_id=f"deliver_{view.lower()}",
+        sql=SQL_TEXT_DELIVERIES.format(dt_hour='2022100300', view=view),
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA,
+        role=SNOWFLAKE_ROLE
     )
-    task.set_upstream(delivery_grouping)
+    deliver_data.set_upstream(delivery_grouping)
 
-    return task
+    return deliver_data
 
 with DAG(
     'snowflake-delivery',
@@ -97,7 +103,8 @@ with DAG(
     )
 
     delivery_grouping = DummyOperator(
-        task_id="delivery_grouping"
+        task_id='run_deliveries',
+        trigger_rule='all_done'
     )
 
     @task
@@ -134,6 +141,6 @@ with DAG(
     [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation() >> delivery_grouping
 
     # Airflow dynamic tasks should be used here (v2.3.0), but this workaround is necessary for Airflow v2.2.2
-    for setting in get_snowflake_delivery_settings():
-        if setting['active']:
-            deliver_data(setting)
+    for customer in get_snowflake_customers():
+        if customer['active']:
+            deliver_data(customer)
