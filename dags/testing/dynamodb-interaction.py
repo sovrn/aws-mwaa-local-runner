@@ -10,7 +10,6 @@ with DAG(
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
-
     @task
     def get_snowflake_customer_settings():
         boto3 = Boto3('dynamodb')
