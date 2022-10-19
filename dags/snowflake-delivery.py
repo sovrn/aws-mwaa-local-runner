@@ -96,7 +96,9 @@ with DAG(
                 pass
             else:
                 # Deactivates the customer's delivery
-                Boto3.set_dynamo_attr_false(
+                boto3 = Boto3('dynamodb')
+
+                boto3.set_dynamo_attr_false(
                     DYANMO_TABLE_NAME,
                     DYNAMO_KEY_FIELD,
                     dynamo_key,
