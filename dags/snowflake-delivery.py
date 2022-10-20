@@ -7,7 +7,6 @@ from util.aws.boto3 import Boto3
 
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
-from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.decorators import task
 from airflow.exceptions import AirflowException
@@ -59,13 +58,21 @@ def get_snowflake_customers() -> Iterable:
 
     return boto3.get_dynamo_table_items(DYANMO_TABLE_NAME)
 
-def deliver_data(setting):
-    view = setting['view']
+# Ideally this function should come from utils, but not sure if the airflow templates are available from outside a dag
+def get_dt_hour():
+    exec_date = "{{ ds_nodash }}"
+    hour = "{{ '{:02}'.format(execution_date.hour) }}"
+    dt_hour = "{0}{1}".format(exec_date, hour)
+
+    return dt_hour
+
+def deliver_data(dt_hour, customer):
+    view = customer['view']
 
     deliver_data = SnowflakeOperator(
         snowflake_conn_id = 'snowflake_conn',
         task_id=f"deliver_{view.lower()}",
-        sql=SQL_TEXT_DELIVERIES.format(dt_hour='2022100300', view=view),
+        sql=SQL_TEXT_DELIVERIES.format(dt_hour=dt_hour, view=view),
         warehouse=SNOWFLAKE_WAREHOUSE,
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
@@ -142,5 +149,7 @@ with DAG(
 
     # Airflow dynamic tasks should be used here (v2.3.0), but this workaround is necessary for Airflow v2.2.2
     for customer in get_snowflake_customers():
+        dt_hour = get_dt_hour()
+
         if customer['active']:
-            deliver_data(customer)
+            deliver_data(dt_hour, customer)
