@@ -4,7 +4,7 @@ from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.exceptions import AirflowException
 
-DAG_ID = "snowflake-minimal-data-retrieval"
+DAG_ID = "snowflake_minimal_data_retrieval"
 
 SNOWFLAKE_CONN_ID = 'snowflake_conn'
 SNOWFLAKE_ROLE = 'ACCOUNTADMIN'

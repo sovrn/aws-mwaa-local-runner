@@ -3,7 +3,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 
-DAG_ID = "spawn-multiple-tasks"
+DAG_ID = "spawn_multiple_tasks"
 
 SNOWFLAKE_CONN_ID = 'snowflake_conn'
 SNOWFLAKE_ROLE = 'ACCOUNTADMIN'

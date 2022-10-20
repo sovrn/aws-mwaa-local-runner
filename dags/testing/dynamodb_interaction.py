@@ -6,7 +6,7 @@ from airflow import DAG
 from airflow.decorators import task
 
 with DAG(
-    'dynamodb-interaction',
+    'dynamodb_interaction',
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
