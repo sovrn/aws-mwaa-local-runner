@@ -1,11 +1,11 @@
 from airflow.providers.amazon.aws.hooks.dynamodb import AwsDynamoDBHook
 
-#AWS_CONN_ID = 'aws_ops_access'
+AWS_CONN_ID = 'aws_ops_access'
 
 class Boto3:
     def __init__(self, client_type):
         self.client_conn = AwsDynamoDBHook(
-            #aws_conn_id=AWS_CONN_ID,
+            aws_conn_id=AWS_CONN_ID,
             client_type=client_type
         ).conn
 
