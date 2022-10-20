@@ -54,7 +54,7 @@ def deliver_data(dt_hour, customer):
     return deliver_data
 
 with DAG(
-    'snowflake-delivery',
+    'snowflake_delivery',
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
@@ -69,5 +69,5 @@ with DAG(
     for customer in get_snowflake_customers():
         dt_hour = get_dt_hour()
 
-        if customer['active'] and 'TEST' in customer['view']:
+        if customer['active']:
             deliver_data(dt_hour, customer)

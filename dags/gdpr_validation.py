@@ -52,7 +52,7 @@ def save_view_ddl(results):
     return view_dict
 
 with DAG(
-    'gdpr-validation',
+    'gdpr_validation',
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
@@ -111,7 +111,7 @@ with DAG(
 
     trigger_snowflake_delivery = TriggerDagRunOperator(
         task_id='trigger_snowflake_delivery',
-        trigger_dag_id='snowflake-delivery'
+        trigger_dag_id='snowflake_delivery'
     )
 
     [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation() >> trigger_snowflake_delivery
