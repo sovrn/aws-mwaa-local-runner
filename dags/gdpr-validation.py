@@ -5,6 +5,7 @@ from util.util import Util
 from util.aws.boto3 import Boto3
 
 from airflow import DAG
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.decorators import task
 from airflow.exceptions import AirflowException
@@ -108,4 +109,9 @@ with DAG(
         if fail_check:
             raise AirflowException("GDPR or Audience check failed")
 
-    [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation()
+    trigger_snowflake_delivery = TriggerDagRunOperator(
+        task_id='trigger_snowflake_delivery',
+        trigger_dag_id='snowflake-delivery'
+    )
+
+    [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation() >> trigger_snowflake_delivery
