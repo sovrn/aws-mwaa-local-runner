@@ -1,3 +1,4 @@
+from re import L
 import string
 from datetime import datetime
 from typing import Iterable
@@ -66,6 +67,11 @@ def get_dt_hour():
 
     return dt_hour
 
+def get_delivery_error_status(cursor):
+    for row in cursor:
+        if 'failed' in str(row).lower():
+            raise AirflowException('Delivery failed with error '+str(row))
+
 def deliver_data(dt_hour, customer):
     view = customer['view']
 
@@ -76,7 +82,8 @@ def deliver_data(dt_hour, customer):
         warehouse=SNOWFLAKE_WAREHOUSE,
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
-        role=SNOWFLAKE_ROLE
+        role=SNOWFLAKE_ROLE,
+        handler=get_delivery_error_status
     )
     deliver_data.set_upstream(delivery_grouping)
 
