@@ -111,6 +111,7 @@ with DAG(
 
     trigger_snowflake_delivery = TriggerDagRunOperator(
         task_id='trigger_snowflake_delivery',
+        trigger_rule='all_done',
         trigger_dag_id='snowflake_delivery'
     )
 
