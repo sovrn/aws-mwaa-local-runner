@@ -2,6 +2,7 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
+from airflow.exceptions import AirflowException
 
 DAG_ID = "snowflake-minimal-data-retrieval"
 
@@ -11,11 +12,14 @@ SNOWFLAKE_DATABASE = 'SOVRN'
 SNOWFLAKE_SCHEMA = 'PUBLIC'
 SNOWFLAKE_WAREHOUSE = 'COMPUTE_WH'
 
-SQL_TEXT = 'SELECT 1 AS COL1;'
+SQL_TEXT = 'CALL SP_AIRFLOW_TEST();'
 
 def print_result(cursor):
     for row in cursor:
-        print('the sql result is: '+str(row["COL1"]))
+        print(str(row))
+
+        if 'failed' in str(row).lower():
+            raise AirflowException('Delivery failed with error '+str(row))
 
 with DAG(
     DAG_ID,
