@@ -59,8 +59,7 @@ with DAG(
     catchup=False,
 ) as dag:
     delivery_grouping = DummyOperator(
-        task_id='run_deliveries',
-        trigger_rule='all_done'
+        task_id='run_deliveries'
     )
 
     delivery_grouping
