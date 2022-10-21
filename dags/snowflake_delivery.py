@@ -49,7 +49,9 @@ def deliver_data(dt_hour, customer):
         role=SNOWFLAKE_ROLE,
         handler=get_delivery_error_status
     )
-    deliver_data.set_upstream(delivery_grouping)
+    
+    deliver_data.set_upstream(run_deliveries)
+    deliver_data.set_downstream(trigger_alert)
 
     return deliver_data
 
@@ -58,11 +60,17 @@ with DAG(
     start_date=datetime(1970, 1, 1),
     catchup=False,
 ) as dag:
-    delivery_grouping = DummyOperator(
+    run_deliveries = DummyOperator(
         task_id='run_deliveries'
     )
 
-    delivery_grouping
+    # This task will show green (succeeded) when at least one delivery fails or orange (skipped) otherwise
+    trigger_alert = DummyOperator(
+        task_id='trigger_alert',
+        trigger_rule='one_failed'
+    )
+
+    run_deliveries
 
     # Airflow dynamic tasks should be used here (v2.3.0), but this workaround is necessary for Airflow v2.2.2
     for customer in get_snowflake_customers():
