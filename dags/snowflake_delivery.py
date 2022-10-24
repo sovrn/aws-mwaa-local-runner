@@ -5,6 +5,7 @@ from util.aws.boto3 import Boto3
 
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
+from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.exceptions import AirflowException
 
@@ -55,6 +56,9 @@ def deliver_data(dt_hour, customer):
 
     return deliver_data
 
+def log_failure():
+    print('One or more delivery tasks failed')
+
 with DAG(
     'snowflake_delivery',
     start_date=datetime(1970, 1, 1),
@@ -65,9 +69,10 @@ with DAG(
     )
 
     # This task will show green (succeeded) when at least one delivery fails or orange (skipped) otherwise
-    trigger_alert = DummyOperator(
+    trigger_alert = PythonOperator(
         task_id='trigger_alert',
-        trigger_rule='one_failed'
+        trigger_rule='one_failed',
+        python_callable=log_failure
     )
 
     run_deliveries
