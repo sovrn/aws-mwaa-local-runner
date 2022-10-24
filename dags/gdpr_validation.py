@@ -97,7 +97,7 @@ with DAG(
                 # Deactivates the customer's delivery
                 dynamo_db = DynamoDB()
 
-                dynamo_db.set_dynamo_attr_false(
+                dynamo_db.set_attr_false(
                     DYANMO_TABLE_NAME,
                     DYNAMO_KEY_FIELD,
                     dynamo_key,
