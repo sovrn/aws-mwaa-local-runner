@@ -4,7 +4,10 @@ AWS_CONN_ID = 'aws_ops_access'
 
 class DynamoDB:
     def __init__(self):
-        self.client_conn = AwsDynamoDBHook(aws_conn_id=AWS_CONN_ID).conn
+        self.client_conn = AwsDynamoDBHook(
+            aws_conn_id=AWS_CONN_ID,
+            client_type='dynamodb'
+        ).conn
 
     def set_attr_false(self, table_name, key_field, key, attr_name):
         self.client_conn.update_item(
