@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from dags.util.aws.dynamo_db import DynamoDB
+from util.aws.dynamo_db import DynamoDB
 
 from airflow import DAG
 from airflow.decorators import task
