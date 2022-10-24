@@ -2,12 +2,14 @@ from datetime import datetime
 from typing import Iterable
 
 from util.aws.dynamo_db import DynamoDB
+from util.aws.sns import SNS
 
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.exceptions import AirflowException
+from airflow.models import Variable
 
 SNOWFLAKE_CONN_ID = 'snowflake_conn'
 SNOWFLAKE_ROLE = 'ACCOUNTADMIN'
@@ -52,12 +54,23 @@ def deliver_data(dt_hour, customer):
     )
     
     deliver_data.set_upstream(run_deliveries)
-    deliver_data.set_downstream(trigger_alert)
+    
+    deliver_data.set_downstream(send_alert_failure)
+    deliver_data.set_downstream(send_alert_success)
 
     return deliver_data
 
-def log_failure():
-    print('One or more delivery tasks failed')
+def send_alert(new_state_value, new_state_reason, description):
+    sns = SNS()
+    dt_hour = get_dt_hour()
+
+    sns.publish_to_target(
+        target_arn=f'{Variable.get("splunk_sns_arn")}',
+        alarm_name=f'Snowflake delivery failure for {dt_hour}',
+        new_state_value=new_state_value,
+        new_state_reason=new_state_reason,
+        description=description
+    )
 
 with DAG(
     'snowflake_delivery',
@@ -69,10 +82,26 @@ with DAG(
     )
 
     # This task will show green (succeeded) when at least one delivery fails or orange (skipped) otherwise
-    trigger_alert = PythonOperator(
-        task_id='trigger_alert',
+    send_alert_failure = PythonOperator(
+        task_id='send_alert_failure',
         trigger_rule='one_failed',
-        python_callable=log_failure
+        python_callable=send_alert,
+        op_kwargs={
+            'new_state_value': 'ALARM',
+            'new_state_reason': 'failure',
+            'description': 'One or more customer deliveries failed'
+        }
+    )
+
+    send_alert_success = PythonOperator(
+        task_id='send_alert_success',
+        trigger_rule='all_success',
+        python_callable=send_alert,
+        op_kwargs={
+            'new_state_value': 'OK',
+            'new_state_reason': 'success',
+            'description': 'Customer deliveries have been resolved'
+        }
     )
 
     run_deliveries
