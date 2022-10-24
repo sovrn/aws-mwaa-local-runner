@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from util.aws.boto3 import Boto3
+from dags.util.aws.dynamo_db import DynamoDB
 
 from airflow import DAG
 from airflow.decorators import task
@@ -12,7 +12,7 @@ with DAG(
 ) as dag:
     @task
     def get_snowflake_customer_settings():
-        boto3 = Boto3('dynamodb')
-        print(boto3.get_dynamo_table_items('snowflake-delivery-customer-settings'))
+        dynamo_db = DynamoDB()
+        print(dynamo_db.get_table_items('snowflake-delivery-customer-settings'))
 
     get_snowflake_customer_settings()

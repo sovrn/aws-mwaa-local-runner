@@ -41,6 +41,6 @@ class DynamoDB:
     def get_table_items(self, table_name):
         res = self.client_conn.scan(TableName=table_name)
         items = res['Items']
-        items = self.strip_data_types(items)
+        items = self.strip_item_data_types(items)
         
         return items
