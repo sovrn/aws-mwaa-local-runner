@@ -1,8 +1,8 @@
 import string
 from datetime import datetime
 
-from util.util import Util
-from util.aws.boto3 import Boto3
+from dags.util.util import Util
+from dags.util.aws.dynamo_db import DynamoDB
 
 from airflow import DAG
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
@@ -95,9 +95,9 @@ with DAG(
                 pass
             else:
                 # Deactivates the customer's delivery
-                boto3 = Boto3('dynamodb')
+                dynamo_db = DynamoDB()
 
-                boto3.set_dynamo_attr_false(
+                dynamo_db.set_dynamo_attr_false(
                     DYANMO_TABLE_NAME,
                     DYNAMO_KEY_FIELD,
                     dynamo_key,

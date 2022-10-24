@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Iterable
 
-from util.aws.boto3 import Boto3
+from dags.util.aws.dynamo_db import DynamoDB
 
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
@@ -20,9 +20,9 @@ SQL_TEXT_DELIVERIES = "CALL SP_DELIVER_WEBLOG_DATA('{dt_hour}', '{view}')"
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
 
 def get_snowflake_customers() -> Iterable:
-    boto3 = Boto3('dynamodb')
+    dynamo_db = DynamoDB()
 
-    return boto3.get_dynamo_table_items(DYANMO_TABLE_NAME)
+    return dynamo_db.get_table_items(DYANMO_TABLE_NAME)
 
 # Ideally this function should come from utils, but not sure if the airflow templates are available from outside a dag
 def get_dt_hour():
