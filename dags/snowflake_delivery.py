@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Iterable
 
-from dags.util.aws.dynamo_db import DynamoDB
+from util.aws.dynamo_db import DynamoDB
 
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator

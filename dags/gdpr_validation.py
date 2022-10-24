@@ -1,8 +1,8 @@
 import string
 from datetime import datetime
 
-from dags.util.util import Util
-from dags.util.aws.dynamo_db import DynamoDB
+from util.util import Util
+from util.aws.dynamo_db import DynamoDB
 
 from airflow import DAG
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
