@@ -8,6 +8,7 @@ from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
+from airflow.providers.amazon.aws.operators.sns import SnsPublishOperator
 from airflow.exceptions import AirflowException
 from airflow.models import Variable
 
@@ -21,18 +22,16 @@ SQL_TEXT_DELIVERIES = "CALL SP_DELIVER_WEBLOG_DATA('{dt_hour}', '{view}')"
 
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
 
+exec_date = "{{ ds_nodash }}"
+hour = "{{ '{:02}'.format(execution_date.hour) }}"
+dt_hour = "{0}{1}".format(exec_date, hour)
+
+on_call_sns = Variable.get("splunk_sns_arn")
+
 def get_snowflake_customers() -> Iterable:
     dynamo_db = DynamoDB()
 
     return dynamo_db.get_table_items(DYANMO_TABLE_NAME)
-
-# Ideally this function should come from utils, but not sure if the airflow templates are available from outside a dag
-def get_dt_hour():
-    exec_date = "{{ ds_nodash }}"
-    hour = "{{ '{:02}'.format(execution_date.hour) }}"
-    dt_hour = "{0}{1}".format(exec_date, hour)
-
-    return dt_hour
 
 def get_delivery_error_status(cursor):
     for row in cursor:
@@ -60,18 +59,6 @@ def deliver_data(dt_hour, customer):
 
     return deliver_data
 
-def send_alert(new_state_value, new_state_reason, description):
-    sns = SNS()
-    dt_hour = get_dt_hour()
-
-    sns.publish_to_target(
-        target_arn=f'{Variable.get("splunk_sns_arn")}',
-        alarm_name=f'Snowflake delivery failure for {dt_hour}',
-        new_state_value=new_state_value,
-        new_state_reason=new_state_reason,
-        description=description
-    )
-
 with DAG(
     'snowflake_delivery',
     start_date=datetime(1970, 1, 1),
@@ -81,34 +68,34 @@ with DAG(
         task_id='run_deliveries'
     )
 
-    # This task will show green (succeeded) when at least one delivery fails or orange (skipped) otherwise
-    send_alert_failure = PythonOperator(
-        task_id='send_alert_failure',
-        trigger_rule='one_failed',
-        python_callable=send_alert,
-        op_kwargs={
-            'new_state_value': 'ALARM',
-            'new_state_reason': 'failure',
-            'description': 'One or more customer deliveries failed'
-        }
+    send_alert_failure = SnsPublishOperator(
+        task_id='send_sns_fail',
+        target_arn=on_call_sns,
+        message="""{
+        "AlarmName":"Snowflake-Delivery-"""+exec_date+hour+"""\",
+        "NewStateValue":"ALARM",
+        "NewStateReason":"failure",
+        "StateChangeTime":"2022-10-14T01:00:00.000Z",
+        "AlarmDescription":"Snowflake-Delivery failed."}""",
+        trigger_rule='one_failed'
     )
 
-    send_alert_success = PythonOperator(
-        task_id='send_alert_success',
-        trigger_rule='all_success',
-        python_callable=send_alert,
-        op_kwargs={
-            'new_state_value': 'OK',
-            'new_state_reason': 'success',
-            'description': 'Customer deliveries have been resolved'
-        }
+    send_alert_success = SnsPublishOperator(
+        task_id='send_sns_success',
+        target_arn=on_call_sns,
+        message="""{
+        "AlarmName":"Snowflake-Delivery"""+exec_date+hour+ """\",
+        "NewStateValue":"OK",
+        "NewStateReason":"success",
+        "StateChangeTime":"2022-10-14T01:00:00.000Z",
+        "AlarmDescription":"Snowflake-Delivery failed."}""",
+        trigger_rule='all_success'
     )
 
     run_deliveries
 
     # Airflow dynamic tasks should be used here (v2.3.0), but this workaround is necessary for Airflow v2.2.2
     for customer in get_snowflake_customers():
-        dt_hour = get_dt_hour()
 
         if customer['active']:
             deliver_data(dt_hour, customer)
