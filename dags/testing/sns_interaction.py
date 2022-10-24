@@ -4,6 +4,7 @@ from util.aws.sns import SNS
 
 from airflow import DAG
 from airflow.decorators import task
+from airflow.models import Variable
 
 with DAG(
     'sns_interaction',
@@ -13,15 +14,12 @@ with DAG(
     @task
     def publish_to_sns_topic():
         sns = SNS()
-        sns.hook.publish_to_target(
-            target_arn="arn:aws:sns:us-east-2:713386270820:splunk-on-call",
-            message="""{
-                "AlarmName":"VictorOps - CloudWatch Integration TEST",
-                "NewStateValue":"ALARM",
-                "NewStateReason":"failure",
-                "StateChangeTime":"1970-01-01T01:00:00.000Z",
-                "AlarmDescription":"VictorOps - CloudWatch Integration TEST"
-            }"""
+        sns.publish_to_target(
+            target_arn=f'{Variable.get("splunk_sns_arn")}',
+            alarm_name='Snowflake delivery failure',
+            new_state_value='ALARM',
+            new_state_reason='failure',
+            description='One or more customers failed to receive data from Snowflake'
         )
 
     publish_to_sns_topic()
