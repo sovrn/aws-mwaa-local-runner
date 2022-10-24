@@ -2,14 +2,14 @@ from airflow.providers.amazon.aws.hooks.dynamodb import AwsDynamoDBHook
 
 AWS_CONN_ID = 'aws_ops_access'
 
-class Boto3:
-    def __init__(self, client_type):
+class DynamoDB:
+    def __init__(self):
         self.client_conn = AwsDynamoDBHook(
             aws_conn_id=AWS_CONN_ID,
-            client_type=client_type
+            client_type='dynamodb'
         ).conn
 
-    def set_dynamo_attr_false(self, table_name, key_field, key, attr_name):
+    def set_attr_false(self, table_name, key_field, key, attr_name):
         self.client_conn.update_item(
             TableName=table_name,
             Key={f'{key_field}': {
@@ -25,7 +25,7 @@ class Boto3:
         )
 
     # boto3 API calls return a bunch of data types that aren't needed
-    def strip_data_types(self, items):
+    def strip_item_data_types(self, items):
         stripped_items = []
 
         for item in items:
@@ -41,7 +41,7 @@ class Boto3:
 
         return stripped_items
 
-    def get_dynamo_table_items(self, table_name):
+    def get_table_items(self, table_name):
         res = self.client_conn.scan(TableName=table_name)
         items = res['Items']
         items = self.strip_data_types(items)
