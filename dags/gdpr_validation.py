@@ -53,7 +53,8 @@ def save_view_ddl(results):
 
 with DAG(
     'gdpr_validation',
-    start_date=datetime(1970, 1, 1),
+    schedule_interval='0 * * * *',
+    start_date=datetime(2021, 1, 1),
     catchup=False,
 ) as dag:
     get_gdpr_stages = SnowflakeOperator(

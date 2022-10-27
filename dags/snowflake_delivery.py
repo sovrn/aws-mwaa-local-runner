@@ -59,7 +59,7 @@ def deliver_data(dt_hour, customer):
 
 with DAG(
     'snowflake_delivery',
-    start_date=datetime(1970, 1, 1),
+    start_date=datetime(2021, 1, 1),
     catchup=False,
 ) as dag:
     run_deliveries = DummyOperator(
