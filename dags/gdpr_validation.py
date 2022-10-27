@@ -114,7 +114,8 @@ with DAG(
         task_id='trigger_snowflake_delivery',
         trigger_rule='all_done',
         trigger_dag_id='snowflake_delivery',
-        conf={'dt_hour': '{{ dag_run.conf.get("dt_hour") }}'} # purely to pass dt_hour to the delivery
+        # purely to pass dt_hour from the superset to the delivery
+        conf={'dt_hour': '{{ dag_run.conf.get("dt_hour") }}'}
     )
 
     [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation() >> trigger_snowflake_delivery
