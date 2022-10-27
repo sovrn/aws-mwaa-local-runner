@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.dummy import DummyOperator
 
 from datetime import datetime
@@ -9,17 +9,15 @@ default_args = {
     'start_date': datetime(2021, 1, 1)
 }
 
-with DAG('child_dag', 
+with DAG('the_trigger', 
     schedule_interval='@daily', 
     default_args=default_args, 
     catchup=False) as dag:
 
-    child_1 = DummyOperator(
-        task_id='child_task_1'
+    the_trigger = TriggerDagRunOperator(
+        task_id='the_trigger',
+        trigger_dag_id='the_target',
+        conf={'message': 'Hello, world'}
     )
 
-    child_2 = DummyOperator(
-        task_id='child_task_2',
-    )
-
-    child_1 >> child_2
+    the_trigger
