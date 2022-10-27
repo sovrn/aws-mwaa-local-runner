@@ -113,7 +113,8 @@ with DAG(
     trigger_snowflake_delivery = TriggerDagRunOperator(
         task_id='trigger_snowflake_delivery',
         trigger_rule='all_done',
-        trigger_dag_id='snowflake_delivery'
+        trigger_dag_id='snowflake_delivery',
+        conf={'dt_hour': '{{ dag_run.conf.get("dt_hour") }}'} # purely to pass dt_hour to the delivery
     )
 
     [get_gdpr_stages, get_gdpr_views] >> check_for_gdpr_validation() >> trigger_snowflake_delivery

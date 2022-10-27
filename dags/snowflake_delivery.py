@@ -20,10 +20,6 @@ SQL_TEXT_DELIVERIES = "CALL SP_DELIVER_WEBLOG_DATA('{dt_hour}', '{view}')"
 
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
 
-exec_date = "{{ ds_nodash }}"
-hour = "{{ '{:02}'.format(execution_date.hour) }}"
-dt_hour = "{0}{1}".format(exec_date, hour)
-
 on_call_sns = Variable.get("splunk_sns_arn")
 
 def get_snowflake_customers() -> Iterable:
@@ -36,13 +32,13 @@ def get_delivery_error_status(cursor):
         if 'failed' in str(row).lower():
             raise AirflowException('Delivery failed with error '+str(row))
 
-def deliver_data(dt_hour, customer):
+def deliver_data(customer):
     view = customer['view']
 
     deliver_data = SnowflakeOperator(
         snowflake_conn_id = 'snowflake_conn',
         task_id=f"deliver_{view.lower()}",
-        sql=SQL_TEXT_DELIVERIES.format(dt_hour=dt_hour, view=view),
+        sql=SQL_TEXT_DELIVERIES.format(dt_hour='{{ dag_run.conf.get("dt_hour") }}', view=view),
         warehouse=SNOWFLAKE_WAREHOUSE,
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
@@ -70,7 +66,7 @@ with DAG(
         task_id='send_sns_fail',
         target_arn=on_call_sns,
         message="""{
-        "AlarmName":"Snowflake-Delivery-"""+exec_date+hour+"""\",
+        "AlarmName":"Snowflake-Delivery-"""+'{{ dag_run.conf.get("dt_hour") }}'+"""\",
         "NewStateValue":"ALARM",
         "NewStateReason":"failure",
         "StateChangeTime":"2022-10-14T01:00:00.000Z",
@@ -82,7 +78,7 @@ with DAG(
         task_id='send_sns_success',
         target_arn=on_call_sns,
         message="""{
-        "AlarmName":"Snowflake-Delivery"""+exec_date+hour+ """\",
+        "AlarmName":"Snowflake-Delivery"""+'{{ dag_run.conf.get("dt_hour") }}'+"""\",
         "NewStateValue":"OK",
         "NewStateReason":"success",
         "StateChangeTime":"2022-10-14T01:00:00.000Z",
@@ -96,4 +92,4 @@ with DAG(
     for customer in get_snowflake_customers():
 
         if customer['active']:
-            deliver_data(dt_hour, customer)
+            deliver_data(customer)
