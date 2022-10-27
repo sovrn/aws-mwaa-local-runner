@@ -2,11 +2,9 @@ from datetime import datetime
 from typing import Iterable
 
 from util.aws.dynamo_db import DynamoDB
-from util.aws.sns import SNS
 
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
-from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.providers.amazon.aws.operators.sns import SnsPublishOperator
 from airflow.exceptions import AirflowException
