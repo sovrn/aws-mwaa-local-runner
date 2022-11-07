@@ -55,6 +55,7 @@ def deliver_data(customer):
 
 with DAG(
     'snowflake_delivery',
+    schedule_interval=None,
     start_date=datetime(2021, 1, 1),
     catchup=False,
 ) as dag:

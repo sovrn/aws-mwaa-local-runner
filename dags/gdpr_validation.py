@@ -53,7 +53,7 @@ def save_view_ddl(results):
 
 with DAG(
     'gdpr_validation',
-    schedule_interval='0 * * * *',
+    schedule_interval=None,
     start_date=datetime(2021, 1, 1),
     catchup=False,
 ) as dag:
