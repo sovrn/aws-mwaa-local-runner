@@ -43,7 +43,8 @@ def deliver_data(customer):
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
         role=SNOWFLAKE_ROLE,
-        handler=get_delivery_error_status
+        handler=get_delivery_error_status,
+        retries=3
     )
     
     deliver_data.set_upstream(run_deliveries)
