@@ -19,7 +19,7 @@ SNOWFLAKE_WAREHOUSE = 'COMPUTE_WH'
 SQL_TEXT_STAGES = "SHOW STAGES LIKE '%_GDPR'"
 SQL_TEXT_VIEWS = "SHOW VIEWS LIKE '%_GDPR'"
 
-DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
+DYANMO_TABLE_NAME = 'dsol_splunk_urgent'
 DYNAMO_KEY_FIELD = 'staging_prefix'
 
 # Returns a dictionary of GDPR stages and with their corresponding URLs, which will eventually

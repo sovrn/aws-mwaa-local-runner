@@ -20,7 +20,7 @@ SQL_TEXT_DELIVERIES = "CALL SP_DELIVER_WEBLOG_DATA('{dt_hour}', '{view}')"
 
 DYANMO_TABLE_NAME = 'snowflake-delivery-customer-settings'
 
-on_call_sns = Variable.get("splunk_sns_arn")
+on_call_sns = Variable.get("dsol_splunk_urgent")
 
 def get_snowflake_customers() -> Iterable:
     dynamo_db = DynamoDB()

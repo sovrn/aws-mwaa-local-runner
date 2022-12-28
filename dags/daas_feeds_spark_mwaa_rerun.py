@@ -27,7 +27,7 @@ dash_date = "{{ ds }}"
 hour = "{{ dag_run.conf.get('hour') }}"
 dt_hour = str(exec_date+hour)
 aws_env = str(Variable.get('ENV_aws_account'))
-on_call_sns = str(Variable.get('splunk_sns_arn'))
+on_call_sns = str(Variable.get('dsol_splunk_urgent'))
 
 AWS_CONN_ID = 'aws_'+aws_env+'_access'
 
